@@ -31,26 +31,37 @@ GO
 CREATE PROCEDURE Load_products
 AS
 BEGIN
-	INSERT INTO products(product_id, name,Description,price,weight,created_at)
-	SELECT 
-		src.product_id,
-		src.name,
-		src.Description,
-		src.Price,
-		TRY_CAST(
-			REPLACE(
-				REVERSE(
-					SUBSTRING(
-						REVERSE(src.Description),
-						CHARINDEX(' ', REVERSE(src.Description))+1,
-						5
-					)
-				),
-			',','.')
-		AS DECIMAL(18,3)),
-		src.created_at
-	FROM tovari src
-	WHERE NOT EXISTS(SELECT 1 FROM products dwh WHERE dwh.product_id = src.product_id)
+	INSERT INTO products (product_id, name, Description, price, weight, created_at)
+SELECT 
+    src.product_id,
+    src.name,
+    src.Description,
+    src.Price,
+    TRY_CAST(
+        REPLACE(
+            REVERSE(
+                SUBSTRING(
+                    step2.RevDesc, 
+                    1, 
+                    CASE 
+                        WHEN CHARINDEX(' ', step2.RevDesc) > 0 THEN CHARINDEX(' ', step2.RevDesc) - 1
+                        ELSE LEN(step2.RevDesc) 
+                    END
+                )
+            ), 
+        ',', '.') 
+    AS DECIMAL(18,3)),
+    src.created_at
+FROM tovari src
+CROSS APPLY (
+    SELECT REPLACE(REPLACE(REPLACE(src.Description, ' Í„.', ''), ' „.', ''), ' „', '') AS Cleaned
+) step1
+CROSS APPLY (
+    SELECT REVERSE(step1.Cleaned) AS RevDesc
+) step2
+WHERE NOT EXISTS (
+    SELECT 1 FROM products dwh WHERE dwh.product_id = src.product_id
+);
 END
 GO
 
